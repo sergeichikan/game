@@ -1,117 +1,168 @@
-const canvas = document.querySelector<HTMLCanvasElement>('canvas[id="myCanvas"]');
+import { Point } from "./point.js";
+import { Circle } from "./circle.js";
+import { Follower } from "./follower.js";
 
-if (!canvas) {
-    throw new Error("canvas not found");
+const getCanvas = (): [HTMLCanvasElement, CanvasRenderingContext2D] => {
+    const canvas = document.querySelector<HTMLCanvasElement>('canvas[id="myCanvas"]');
+    if (!canvas) {
+        throw new Error("canvas not found");
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+        throw new Error("ctx is null");
+    }
+    return [
+        canvas,
+        ctx,
+    ];
+};
+
+const [ canvas, ctx ] = getCanvas();
+
+const canvasDiagonal = Math.sqrt(Math.pow(canvas.width, 2) + Math.pow(canvas.height, 2));
+const random = (min: number, max: number): number => min + Math.random() * (max - min);
+const randomPoint = () => new Point(random(0, canvas.width), random(0, canvas.height));
+
+class FireBallFollower extends Follower {
+    public constructor(from: Point) {
+        super(from, 4);
+    }
+
+    public setTarget(target: Point) {
+        super.setTarget(target);
+        super.setTarget(this.getPointOnLine(canvasDiagonal));
+    }
 }
 
-const ctx = canvas.getContext("2d");
+class FireBall {
 
-if (!ctx) {
-    throw new Error("ctx is null");
-}
+    public shape: Circle;
+    public follower: FireBallFollower;
 
-class Point {
-
-    public x: number;
-    public y: number;
-
-    public constructor(x: number, y: number) {
-        this.x = x;
-        this.y = y;
+    public constructor(from: Point, shape: Circle) {
+        this.shape = shape;
+        this.follower = new FireBallFollower(from);
     }
-
-    public clone(): Point {
-        return new Point(this.x, this.y);
-    }
-
-    public distance({ x, y }: Point) {
-        return Math.sqrt(Math.pow(Math.abs(x - this.x), 2) + Math.pow(Math.abs(y - this.y), 2));
-    }
-
-    static readonly fromMouse = ({ clientX, clientY }: MouseEvent, canvas: HTMLCanvasElement) => {
-        const { left, top } = canvas.getBoundingClientRect();
-        return new Point(clientX - left, clientY - top);
-    };
 }
 
 class Wizard {
 
-    public location: Point;
-    public radius: number;
-    public stepLength: number;
-    public target: Point;
-    public distance: number;
-    private cos: number;
-    private sin: number;
+    public readonly shape: Circle;
+    public readonly follower: Follower;
+    public isPreCast: string;
 
-    public constructor(location: Point) {
-        this.target = this.location = location;
-        this.radius = 10;
-        this.stepLength = 2;
-        this.distance = 0;
-        this.cos = 0;
-        this.sin = 0;
+    public constructor(location: Point, shape: Circle) {
+        this.shape = shape;
+        this.follower = new Follower(location);
+        this.isPreCast = "";
     }
 
-    public draw(ctx: CanvasRenderingContext2D) {
-        ctx.beginPath();
-        ctx.arc(this.location.x, this.location.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = "#0095DD";
-        ctx.fill();
-        ctx.closePath();
+    public mousedown(event: MouseEvent) {
+        const point = Point.fromMouse(event, canvas.getBoundingClientRect());
+        switch (this.isPreCast) {
+            case "KeyW":
+                return this.blink(point);
+            case "KeyR":
+                return this.fireBall(point);
+        }
+        return this.follower.setTarget(point);
     }
 
-    public drawTarget(ctx: CanvasRenderingContext2D) {
-        ctx.beginPath();
-        ctx.arc(this.target.x, this.target.y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = "#000000";
-        ctx.fill();
-        ctx.closePath();
+    public keydown(event: KeyboardEvent) {
+        this.isPreCast = event.code;
     }
 
-    public drawPath(ctx: CanvasRenderingContext2D) {
-        ctx.beginPath();
-        ctx.lineWidth = 1;
-        ctx.moveTo(this.location.x, this.location.y);
-        ctx.lineTo(this.target.x, this.target.y);
-        ctx.strokeStyle = "black";
-        ctx.stroke();
-        ctx.closePath();
+    public blink(target: Point) {
+        this.follower.from = target;
+        this.follower.stop();
+        this.isPreCast = "";
     }
 
-    public setTarget(target: Point) {
-        this.target = target;
-        this.distance = this.location.distance(target);
-        const angle: number = Math.atan2(target.y - this.location.y, target.x - this.location.x);
-        this.cos = Math.cos(angle);
-        this.sin = Math.sin(angle);
-    }
-
-    public step() {
-        const isLastStep: boolean = this.distance < this.stepLength;
-        const stepLength = isLastStep ? this.distance : this.stepLength;
-        const dx = this.cos * stepLength;
-        const dy = this.sin * stepLength;
-        this.location.x += dx;
-        this.location.y += dy;
-        this.distance = isLastStep ? 0 : this.location.distance(this.target);
+    public fireBall(target: Point) {
+        const shape = new Circle(4, "red");
+        const fireBall = new FireBall(this.follower.from, shape);
+        fireBall.follower.setTarget(target);
+        game.fireBalls.push(fireBall);
+        this.isPreCast = "";
     }
 }
 
-// canvas.addEventListener("contextmenu", (e) => e.button === 2 && e.preventDefault());
+class WizardBot extends Wizard {
+    public constructor(location: Point, shape: Circle) {
+        super(location, shape);
+        setInterval(() => {
+            this.follower.setTarget(randomPoint());
+        }, 1000);
+        setInterval(() => {
+            this.fireBall(randomPoint());
+        }, 500);
+    }
+}
 
-const wizard = new Wizard(new Point(canvas.width / 2, canvas.height / 2));
+class Game {
+
+    public readonly wizards: Wizard[];
+    public fireBalls: FireBall[];
+
+    public constructor() {
+        this.wizards = [];
+        this.fireBalls = [];
+    }
+
+    public drawAll() {
+        this.wizards.forEach((wizard) => {
+            wizard.shape.draw(ctx, wizard.follower.from);
+            wizard.follower.drawTarget(ctx);
+            wizard.follower.drawPath(ctx);
+        });
+        this.fireBalls.forEach((fireBall) => {
+            fireBall.shape.draw(ctx, fireBall.follower.from);
+            fireBall.follower.drawPath(ctx);
+            fireBall.follower.drawTarget(ctx);
+        });
+    }
+
+    public stepAll() {
+        this.wizards.forEach((wizard) => {
+            wizard.follower.distance && wizard.follower.step();
+        });
+        this.fireBalls = this.fireBalls.filter((fireBall) => fireBall.follower.distance);
+        this.fireBalls.forEach((fireBall) => {
+            fireBall.follower.step();
+        });
+    }
+}
+
+canvas.addEventListener("contextmenu", (e) => e.button === 2 && e.preventDefault());
+
+const wizard = new Wizard(new Point(canvas.width / 2, canvas.height / 2), new Circle(10, "#0095DD"));
+const bot = new WizardBot(new Point(20, 20), new Circle(10, "blue"));
+
+const game = new Game();
+game.wizards.push(wizard);
+game.wizards.push(bot);
 
 canvas.addEventListener("mousedown", (event: MouseEvent) => {
-    wizard.setTarget(Point.fromMouse(event, canvas));
+    wizard.mousedown(event);
+});
+
+// let mousemoveX: number = 0;
+// let mousemoveY: number = 0;
+// canvas.addEventListener("mousemove", ({ clientX, clientY }: MouseEvent) => {
+//     mousemoveX = clientX;
+//     mousemoveY = clientY;
+// });
+
+document.addEventListener("keydown", (event: KeyboardEvent) => {
+    wizard.keydown(event);
 });
 
 const draw = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    wizard.distance && wizard.step();
-    wizard.draw(ctx);
-    wizard.drawTarget(ctx);
-    wizard.drawPath(ctx);
+
+    game.stepAll();
+    game.drawAll();
+
     requestAnimationFrame(draw);
 };
 
