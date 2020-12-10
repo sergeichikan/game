@@ -9,30 +9,12 @@ export class Follower {
     private cos: number;
     private sin: number;
 
-    public constructor(from: Point, stepLength: number = 2) {
+    public constructor(from: Point, stepLength: number) {
         this.stepLength = stepLength;
         this.from = this.to = from;
         this.distance = 0;
         this.cos = 0;
         this.sin = 0;
-    }
-
-    public drawPath(ctx: CanvasRenderingContext2D) {
-        ctx.beginPath();
-        ctx.lineWidth = 1;
-        ctx.moveTo(this.from.x, this.from.y);
-        ctx.lineTo(this.to.x, this.to.y);
-        ctx.strokeStyle = "black";
-        ctx.stroke();
-        ctx.closePath();
-    }
-
-    public drawTarget(ctx: CanvasRenderingContext2D) {
-        ctx.beginPath();
-        ctx.arc(this.to.x, this.to.y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = "black";
-        ctx.fill();
-        ctx.closePath();
     }
 
     protected rebuild() {

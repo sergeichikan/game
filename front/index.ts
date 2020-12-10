@@ -1,168 +1,121 @@
-import { Point } from "./point.js";
-import { Circle } from "./circle.js";
-import { Follower } from "./follower.js";
+import { botFillStyle, endAngle, enemyFillStyle, playerFillStyle, radius, startAngle } from "../configs/wizard.js";
+import * as fireBallConfig from "../configs/fire-ball.js";
+import { Point } from "../libs/point.js";
+import { Game } from "../libs/game.js";
+import { Wizard } from "../libs/wizard";
+import { fillStyle as fireBallFillStyle } from "../configs/fire-ball.js";
+import { FireBall } from "../libs/fire-ball.js";
+import { initCanvas } from "./init-canvas.js";
 
-const getCanvas = (): [HTMLCanvasElement, CanvasRenderingContext2D] => {
-    const canvas = document.querySelector<HTMLCanvasElement>('canvas[id="myCanvas"]');
-    if (!canvas) {
-        throw new Error("canvas not found");
-    }
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-        throw new Error("ctx is null");
-    }
-    return [
-        canvas,
-        ctx,
-    ];
-};
+const idInput = document.querySelector<HTMLInputElement>('input[id="idInput"]');
+const joinButton = document.querySelector<HTMLButtonElement>('button[id="joinButton"]');
 
-const [ canvas, ctx ] = getCanvas();
-
-const canvasDiagonal = Math.sqrt(Math.pow(canvas.width, 2) + Math.pow(canvas.height, 2));
-const random = (min: number, max: number): number => min + Math.random() * (max - min);
-const randomPoint = () => new Point(random(0, canvas.width), random(0, canvas.height));
-
-class FireBallFollower extends Follower {
-    public constructor(from: Point) {
-        super(from, 4);
-    }
-
-    public setTarget(target: Point) {
-        super.setTarget(target);
-        super.setTarget(this.getPointOnLine(canvasDiagonal));
-    }
+if (!idInput || !joinButton) {
+    throw new Error("invalid elements");
 }
 
-class FireBall {
+const { canvas, ctx } = initCanvas();
 
-    public shape: Circle;
-    public follower: FireBallFollower;
+let game: Game | undefined;
+const keyUrlMap = new Map([
+    ["KeyW", "/blink"],
+    ["KeyR", "/fire"],
+]);
+let isPreCast: string = "";
 
-    public constructor(from: Point, shape: Circle) {
-        this.shape = shape;
-        this.follower = new FireBallFollower(from);
-    }
-}
+const eventSource: EventSource = new EventSource("/sse");
 
-class Wizard {
-
-    public readonly shape: Circle;
-    public readonly follower: Follower;
-    public isPreCast: string;
-
-    public constructor(location: Point, shape: Circle) {
-        this.shape = shape;
-        this.follower = new Follower(location);
-        this.isPreCast = "";
-    }
-
-    public mousedown(event: MouseEvent) {
-        const point = Point.fromMouse(event, canvas.getBoundingClientRect());
-        switch (this.isPreCast) {
-            case "KeyW":
-                return this.blink(point);
-            case "KeyR":
-                return this.fireBall(point);
-        }
-        return this.follower.setTarget(point);
-    }
-
-    public keydown(event: KeyboardEvent) {
-        this.isPreCast = event.code;
-    }
-
-    public blink(target: Point) {
-        this.follower.from = target;
-        this.follower.stop();
-        this.isPreCast = "";
-    }
-
-    public fireBall(target: Point) {
-        const shape = new Circle(4, "red");
-        const fireBall = new FireBall(this.follower.from, shape);
-        fireBall.follower.setTarget(target);
-        game.fireBalls.push(fireBall);
-        this.isPreCast = "";
-    }
-}
-
-class WizardBot extends Wizard {
-    public constructor(location: Point, shape: Circle) {
-        super(location, shape);
-        setInterval(() => {
-            this.follower.setTarget(randomPoint());
-        }, 1000);
-        setInterval(() => {
-            this.fireBall(randomPoint());
-        }, 500);
-    }
-}
-
-class Game {
-
-    public readonly wizards: Wizard[];
-    public fireBalls: FireBall[];
-
-    public constructor() {
-        this.wizards = [];
-        this.fireBalls = [];
-    }
-
-    public drawAll() {
-        this.wizards.forEach((wizard) => {
-            wizard.shape.draw(ctx, wizard.follower.from);
-            wizard.follower.drawTarget(ctx);
-            wizard.follower.drawPath(ctx);
-        });
-        this.fireBalls.forEach((fireBall) => {
-            fireBall.shape.draw(ctx, fireBall.follower.from);
-            fireBall.follower.drawPath(ctx);
-            fireBall.follower.drawTarget(ctx);
-        });
-    }
-
-    public stepAll() {
-        this.wizards.forEach((wizard) => {
-            wizard.follower.distance && wizard.follower.step();
-        });
-        this.fireBalls = this.fireBalls.filter((fireBall) => fireBall.follower.distance);
-        this.fireBalls.forEach((fireBall) => {
-            fireBall.follower.step();
-        });
-    }
-}
-
-canvas.addEventListener("contextmenu", (e) => e.button === 2 && e.preventDefault());
-
-const wizard = new Wizard(new Point(canvas.width / 2, canvas.height / 2), new Circle(10, "#0095DD"));
-const bot = new WizardBot(new Point(20, 20), new Circle(10, "blue"));
-
-const game = new Game();
-game.wizards.push(wizard);
-game.wizards.push(bot);
-
-canvas.addEventListener("mousedown", (event: MouseEvent) => {
-    wizard.mousedown(event);
+eventSource.addEventListener("message", ({ data }: MessageEvent<string>) => {
+    game = JSON.parse(data);
 });
 
-// let mousemoveX: number = 0;
-// let mousemoveY: number = 0;
-// canvas.addEventListener("mousemove", ({ clientX, clientY }: MouseEvent) => {
-//     mousemoveX = clientX;
-//     mousemoveY = clientY;
-// });
+canvas.addEventListener("mousedown", (e) => {
+    const { value: id } = idInput;
+    const target = Point.fromMouse(e, canvas.getBoundingClientRect());
+    const body = JSON.stringify({
+        target,
+        id,
+    });
+    const init = {
+        method: "POST",
+        body,
+    };
+    const url = keyUrlMap.get(isPreCast) || "/target";
+    isPreCast = "";
+    return fetch(url, init);
+});
 
 document.addEventListener("keydown", (event: KeyboardEvent) => {
-    wizard.keydown(event);
+    isPreCast = event.code;
 });
 
+joinButton.addEventListener("click", async () => {
+    const { value: id } = idInput;
+    const body = JSON.stringify({
+        id,
+    });
+    console.log("/join", body);
+    await fetch("/join", {
+        method: "POST",
+        body,
+    });
+});
+
+const drawWizard = (wizard: Wizard, fillStyle: string) => {
+    ctx.beginPath();
+    ctx.arc(wizard.follower.from.x, wizard.follower.from.y, radius, startAngle, endAngle);
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+    ctx.closePath();
+};
+
+const wizardDrawTarget = (wizard: Wizard) => {
+    ctx.beginPath();
+    ctx.arc(wizard.follower.to.x, wizard.follower.to.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = "black";
+    ctx.fill();
+    ctx.closePath();
+};
+
+const wizardDrawPath = (wizard: Wizard) => {
+    ctx.beginPath();
+    ctx.lineWidth = 1;
+    ctx.moveTo(wizard.follower.from.x, wizard.follower.from.y);
+    ctx.lineTo(wizard.follower.to.x, wizard.follower.to.y);
+    ctx.strokeStyle = "black";
+    ctx.stroke();
+    ctx.closePath();
+};
+
+const fireBallDraw = (fireBall: FireBall) => {
+    ctx.beginPath();
+    ctx.arc(fireBall.follower.from.x, fireBall.follower.from.y, fireBallConfig.radius, fireBallConfig.startAngle, fireBallConfig.endAngle);
+    ctx.fillStyle = fireBallFillStyle;
+    ctx.fill();
+    ctx.closePath();
+};
+
 const draw = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    game.stepAll();
-    game.drawAll();
-
+    if (game) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        game.wizards.forEach((wizard) => {
+            if (wizard.id === idInput.value) {
+                drawWizard(wizard, playerFillStyle);
+            } else {
+                drawWizard(wizard, enemyFillStyle);
+            }
+            wizardDrawTarget(wizard);
+            wizardDrawPath(wizard);
+        });
+        game.bots.forEach((wizard) => {
+            drawWizard(wizard, botFillStyle);
+            wizardDrawTarget(wizard);
+            wizardDrawPath(wizard);
+        });
+        game.fireBalls.forEach((fireBall) => {
+            fireBallDraw(fireBall);
+        });
+    }
     requestAnimationFrame(draw);
 };
 
