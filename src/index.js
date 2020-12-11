@@ -11,9 +11,6 @@ import { sendError } from "../libs/send-error.js";
 import { FireBall } from "../libs/fire-ball.js";
 import { Bomb } from "../libs/bomb.js";
 const game = new Game();
-const bot0 = new Wizard(getRandomPoint(), "bot0");
-game.wizards.push(bot0);
-game.bots.push(bot0);
 const server = createServer();
 server.on("request", ({ method, url }) => console.log(method, url));
 server.on("request", (req, res) => {
@@ -80,6 +77,11 @@ server.on("request", (req, res) => {
                 game.bombs.push(bomb);
                 res.end();
             });
+        case "/bot":
+            const bot = new Wizard(getRandomPoint(), "bot");
+            game.wizards.push(bot);
+            game.bots.push(bot);
+            return res.end();
         default:
             return notFound(res);
     }

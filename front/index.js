@@ -6,8 +6,9 @@ import { initCanvas } from "./init-canvas.js";
 const idInput = document.querySelector('input[id="idInput"]');
 const joinButton = document.querySelector('button[id="joinButton"]');
 const closeButton = document.querySelector('button[id="closeButton"]');
+const addBotButton = document.querySelector('button[id="addBotButton"]');
 const hpSpan = document.querySelector('span[id="hpSpan"]');
-if (!idInput || !joinButton || !closeButton || !hpSpan) {
+if (!idInput || !joinButton || !closeButton || !hpSpan || !addBotButton) {
     throw new Error("invalid elements");
 }
 const { canvas, ctx } = initCanvas();
@@ -59,6 +60,11 @@ joinButton.addEventListener("click", async () => {
     await fetch("/join", {
         method: "POST",
         body,
+    });
+});
+addBotButton.addEventListener("click", async () => {
+    await fetch("/bot", {
+        method: "POST",
     });
 });
 const drawWizard = (wizard, fillStyle) => {

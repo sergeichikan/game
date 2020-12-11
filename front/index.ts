@@ -11,9 +11,10 @@ import {Bomb} from "../libs/bomb";
 const idInput = document.querySelector<HTMLInputElement>('input[id="idInput"]');
 const joinButton = document.querySelector<HTMLButtonElement>('button[id="joinButton"]');
 const closeButton = document.querySelector<HTMLButtonElement>('button[id="closeButton"]');
+const addBotButton = document.querySelector<HTMLButtonElement>('button[id="addBotButton"]');
 const hpSpan = document.querySelector<HTMLSpanElement>('span[id="hpSpan"]');
 
-if (!idInput || !joinButton || !closeButton || !hpSpan) {
+if (!idInput || !joinButton || !closeButton || !hpSpan || !addBotButton) {
     throw new Error("invalid elements");
 }
 
@@ -73,6 +74,12 @@ joinButton.addEventListener("click", async () => {
     await fetch("/join", {
         method: "POST",
         body,
+    });
+});
+
+addBotButton.addEventListener("click", async () => {
+    await fetch("/bot", {
+        method: "POST",
     });
 });
 
