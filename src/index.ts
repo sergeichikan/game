@@ -96,5 +96,5 @@ server.on("request", (req: IncomingMessage, res: ServerResponse) => {
 server.listen(options, () => {
     game.runBots();
     game.run();
-    console.log(`http://${options.host}:${options.port}/`);
+    console.log(`http://${options.host || "localhost"}:${options.port}/`);
 });

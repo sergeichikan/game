@@ -89,6 +89,6 @@ server.on("request", (req, res) => {
 server.listen(options, () => {
     game.runBots();
     game.run();
-    console.log(`http://${options.host}:${options.port}/`);
+    console.log(`http://${options.host || "localhost"}:${options.port}/`);
 });
 //# sourceMappingURL=index.js.map

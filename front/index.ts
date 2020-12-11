@@ -35,15 +35,15 @@ let isPreCast: string = "";
 
 const eventSource: EventSource = new EventSource("/sse");
 
-eventSource.addEventListener("message", ({ data }: MessageEvent<string>) => {
+eventSource.addEventListener("message", ({ data, lastEventId }: MessageEvent<string>) => {
     game = JSON.parse(data);
+    const ping = Date.now() - parseInt(lastEventId, 10)
+    console.log(ping);
     const [ { hp = 0 } = {} ] = game.wizards.filter(({ id }) => id === idInput.value);
     hpSpan.textContent = hp.toString(10);
 });
 
-closeButton.addEventListener("click", () => {
-    eventSource.close();
-});
+closeButton.addEventListener("click", () => eventSource.close());
 
 canvas.addEventListener("mousedown", (e) => {
     const { value: id } = idInput;
