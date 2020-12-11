@@ -1,6 +1,6 @@
 import { ListenOptions } from "net";
 
 export const options: ListenOptions = {
-    host: "localhost",
+    // host: "localhost",
     port: 3000,
 };
