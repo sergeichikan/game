@@ -8,22 +8,17 @@ import { notFound } from "../libs/not-found-res.js";
 import { getRandomPoint } from "../libs/get-random-point.js";
 import { Game } from "../libs/game.js";
 import { sendStatic } from "../libs/send-static.js";
+import { sendError } from "../libs/send-error.js";
+import { FireBall } from "../libs/fire-ball.js";
+import { Bomb } from "../libs/bomb.js";
 
 const game = new Game();
 
-const bot1 = new Wizard(getRandomPoint(), "bot1");
-game.wizards.push(bot1);
-game.bots.push(bot1);
+const bot0 = new Wizard(getRandomPoint(), "bot0");
+game.wizards.push(bot0);
+game.bots.push(bot0);
 
 const server = createServer();
-
-const runSSE = (req: IncomingMessage, res: ServerResponse) => {
-    res.writeHead(200, {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache",
-    });
-    game.responses.push(res);
-};
 
 server.on("request", ({ method, url }) => console.log(method, url));
 
@@ -33,14 +28,14 @@ server.on("request", (req: IncomingMessage, res: ServerResponse) => {
     }
     switch (req.url) {
         case "/":
-            return sendStatic("/front/index.html", res).catch((err) => {
-                console.log(err);
-                return notFound(res);
-            });
+            return sendStatic("/front/index.html", res).catch((err) => sendError(res, err));
         case "/sse":
-            return runSSE(req, res);
+            res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+            res.setHeader("Cache-Control", "no-cache");
+            game.responses.push(res);
+            return;
         default:
-            return sendStatic(req.url, res).catch(() => notFound(res));
+            return sendStatic(req.url, res).catch((err) => sendError(res, err));
     }
 });
 
@@ -74,16 +69,31 @@ server.on("request", (req: IncomingMessage, res: ServerResponse) => {
             return getBody<any>(req)
                 .then(({ id, target }) => {
                     const wizard = game.getWizard(id);
-                    wizard && wizard.fireBall(Point.fromObj(target), game);
+                    if (!wizard) {
+                        return sendError(res, new Error("wizard not found"));
+                    }
+                    const fireBall = new FireBall(wizard.follower.from, Point.fromObj(target), wizard.radius);
+                    game.fireBalls.push(fireBall);
                     res.end();
                 });
+        case "/bomb":
+            return getBody<any>(req)
+                .then(({ id, target }) => {
+                    const wizard = game.getWizard(id);
+                    if (!wizard) {
+                        return sendError(res, new Error("wizard not found"));
+                    }
+                    const bomb = new Bomb(Point.fromObj(target));
+                    game.bombs.push(bomb);
+                    res.end();
+                })
         default:
             return notFound(res);
     }
 });
 
 server.listen(options, () => {
-    console.log(`http://${options.host}:${options.port}/`);
     game.runBots();
     game.run();
+    console.log(`http://${options.host}:${options.port}/`);
 });

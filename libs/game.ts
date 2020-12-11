@@ -1,11 +1,10 @@
 import { ServerResponse } from "http";
 
 import { interval, botInterval } from "../configs/game.js";
-import { radius } from "../configs/wizard.js";
-import { damage } from "../configs/fire-ball.js";
 import { Wizard } from "./wizard.js";
 import { getRandomPoint } from "./get-random-point.js";
 import { FireBall } from "./fire-ball.js";
+import { Bomb } from "./bomb";
 
 export class Game {
 
@@ -13,12 +12,14 @@ export class Game {
     public bots: Wizard[];
     public readonly responses: ServerResponse[];
     public fireBalls: FireBall[];
+    public bombs: Bomb[];
 
     public constructor() {
         this.wizards = [];
         this.bots = [];
         this.responses = [];
         this.fireBalls = [];
+        this.bombs = [];
     }
 
     public getWizard(id: string): Wizard | undefined {
@@ -31,16 +32,27 @@ export class Game {
 
     private fireBallsStep() {
         this.fireBalls = this.fireBalls.filter(({ follower: { distance } }) => distance);
-        this.fireBalls.forEach((fireBall) => {
-            fireBall.follower.step();
+        this.fireBalls.forEach((fireBall) => fireBall.follower.step());
+    }
+
+    private bombsStep() {
+        this.bombs = this.bombs.filter(({ count }) => count > 0);
+        this.bombs.forEach((bomb) => bomb.step());
+    }
+
+    private bombsDamage() {
+        this.bombs.forEach((bomb) => {
+            this.wizards
+                .filter(({ follower: { from } }, radius) => bomb.from.distance(from) < radius + bomb.radius)
+                .forEach((wizard) => wizard.hp -= bomb.damage);
         });
     }
 
     private fireBallsDamage() {
-        this.fireBalls.forEach((fireBall) => {
+        this.fireBalls.forEach((fireBall: FireBall) => {
             this.wizards
-                .filter(({ follower: { from } }) => fireBall.follower.from.distance(from) < radius)
-                .forEach((wizard) => wizard.hp -= damage);
+                .filter(({ follower: { from } }, radius) => fireBall.follower.from.distance(from) < radius + fireBall.radius)
+                .forEach((wizard) => wizard.hp -= fireBall.damage);
         });
     }
 
@@ -52,7 +64,9 @@ export class Game {
     private tick() {
         this.wizardsStep();
         this.fireBallsStep();
+        this.bombsStep();
         this.fireBallsDamage();
+        this.bombsDamage();
         this.deaths();
     }
 
@@ -61,6 +75,7 @@ export class Game {
             wizards: this.wizards,
             bots: this.bots,
             fireBalls: this.fireBalls,
+            bombs: this.bombs,
         });
         const data = `data: ${json}`;
         const id = `id: ${Date.now()}`;
@@ -77,9 +92,13 @@ export class Game {
 
     public runBots() {
         setInterval(() => {
-            this.bots.forEach((wizard) => {
-                wizard.follower.setTarget(getRandomPoint());
-            });
+            this.bots.forEach((wizard) => wizard.follower.setTarget(getRandomPoint()));
         }, botInterval);
+        setInterval(() => {
+            this.bots.forEach((wizard) => {
+                const fireBall = new FireBall(wizard.follower.from, getRandomPoint(), wizard.radius);
+                this.fireBalls.push(fireBall);
+            });
+        }, 100);
     }
 }

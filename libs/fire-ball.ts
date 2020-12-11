@@ -1,20 +1,16 @@
-import { radius, startAngle, endAngle, fillStyle } from "../configs/fire-ball.js";
+import { defaultStepLength } from "../configs/fire-ball.js";
 import { Point } from "./point.js";
 import { FireBallFollower } from "./fire-ball-follower.js";
 
 export class FireBall {
 
     public readonly follower: FireBallFollower;
+    public damage: number;
+    public radius: number;
 
-    public constructor(from: Point, to: Point, stepLength: number) {
-        this.follower = new FireBallFollower(from, to, stepLength);
+    public constructor(from: Point, to: Point, radius: number = 0, stepLength: number = defaultStepLength) {
+        this.damage = 5;
+        this.radius = 4;
+        this.follower = new FireBallFollower(from, to, stepLength, radius + this.radius);
     }
-
-    // public draw(ctx: CanvasRenderingContext2D) {
-    //     ctx.beginPath();
-    //     ctx.arc(this.follower.from.x, this.follower.from.y, radius, startAngle, endAngle);
-    //     ctx.fillStyle = fillStyle;
-    //     ctx.fill();
-    //     ctx.closePath();
-    // }
 }
